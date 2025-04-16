@@ -5,8 +5,8 @@ import type {
   ResponseFunctionToolCall,
   ResponseInputItem,
   ResponseItem,
-} from "openai/resources/responses/responses.mjs";
-import type { Reasoning } from "openai/resources.mjs";
+} from "@azure/openai";
+import type { Reasoning } from "@azure/openai";
 
 import { log, isLoggingEnabled } from "./log.js";
 import { OPENAI_BASE_URL, OPENAI_TIMEOUT_MS } from "../config.js";
@@ -20,7 +20,7 @@ import {
 } from "../session.js";
 import { handleExecCommand } from "./handle-exec-command.js";
 import { randomUUID } from "node:crypto";
-import OpenAI, { APIConnectionTimeoutError } from "openai";
+import { OpenAIApi, Configuration } from "@azure/openai";
 
 export type CommandConfirmation = {
   review: ReviewDecision;
@@ -57,7 +57,7 @@ export class AgentLoop {
   // type to avoid sprinkling `any` across the implementation while still allowing paths where
   // the OpenAI SDK types may not perfectly match. The `typeof OpenAI` pattern captures the
   // instance shape without resorting to `any`.
-  private oai: OpenAI;
+  private oai: OpenAIApi;
 
   private onItem: (item: ResponseItem) => void;
   private onLoading: (loading: boolean) => void;
@@ -237,23 +237,24 @@ export class AgentLoop {
     this.sessionId = getSessionId() || randomUUID().replaceAll("-", "");
     // Configure OpenAI client with optional timeout (ms) from environment
     const timeoutMs = OPENAI_TIMEOUT_MS;
-    const apiKey = this.config.apiKey ?? process.env["OPENAI_API_KEY"] ?? "";
-    this.oai = new OpenAI({
-      // The OpenAI JS SDK only requires `apiKey` when making requests against
-      // the official API.  When running unit‑tests we stub out all network
-      // calls so an undefined key is perfectly fine.  We therefore only set
-      // the property if we actually have a value to avoid triggering runtime
-      // errors inside the SDK (it validates that `apiKey` is a non‑empty
-      // string when the field is present).
-      ...(apiKey ? { apiKey } : {}),
-      baseURL: OPENAI_BASE_URL,
-      defaultHeaders: {
-        originator: ORIGIN,
-        version: CLI_VERSION,
-        session_id: this.sessionId,
-      },
-      ...(timeoutMs !== undefined ? { timeout: timeoutMs } : {}),
-    });
+    const apiKey = this.config.apiKey ?? process.env["AZURE_OPENAI_API_KEY"] ?? "";
+    const endpoint = process.env["AZURE_OPENAI_ENDPOINT"] ?? "";
+    this.oai = new OpenAIApi(
+      new Configuration({
+        apiKey,
+        azure: {
+          apiKey,
+          endpoint,
+        },
+        basePath: OPENAI_BASE_URL,
+        defaultHeaders: {
+          originator: ORIGIN,
+          version: CLI_VERSION,
+          session_id: this.sessionId,
+        },
+        ...(timeoutMs !== undefined ? { timeout: timeoutMs } : {}),
+      })
+    );
 
     setSessionId(this.sessionId);
     setCurrentModel(this.model);
@@ -542,7 +543,7 @@ export class AgentLoop {
             // do not define the class.  Falling back to `false` when the
             // export is absent ensures the check never throws.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ApiConnErrCtor = (OpenAI as any).APIConnectionError as  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ApiConnErrCtor = (OpenAIApi as any).APIConnectionError as  // eslint-disable-next-line @typescript-eslint/no-explicit-any
               | (new (...args: any) => Error)
               | undefined;
             const isConnectionError = ApiConnErrCtor
@@ -885,7 +886,7 @@ export class AgentLoop {
 
         // Direct instance check for connection errors thrown by the OpenAI SDK.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const ApiConnErrCtor = (OpenAI as any).APIConnectionError as  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ApiConnErrCtor = (OpenAIApi as any).APIConnectionError as  // eslint-disable-next-line @typescript-eslint/no-explicit-any
           | (new (...args: any) => Error)
           | undefined;
         if (ApiConnErrCtor && e instanceof ApiConnErrCtor) {
