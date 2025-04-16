@@ -1,11 +1,3 @@
-// NOTE: We intentionally point the TypeScript import at the source file
-// (`./auto-approval-mode.ts`) instead of the emitted `.js` bundle.  This makes
-// the module resolvable when the project is executed via `ts-node`, which
-// resolves *source* paths rather than built artefacts.  During a production
-// build the TypeScript compiler will automatically rewrite the path to
-// `./auto-approval-mode.js`, so the change is completely transparent for the
-// compiled `dist/` output used by the published CLI.
-
 import type { FullAutoErrorMode } from "./auto-approval-mode.js";
 
 import { log, isLoggingEnabled } from "./agent/log.js";
@@ -35,6 +27,8 @@ export const OPENAI_TIMEOUT_MS =
   parseInt(process.env["OPENAI_TIMEOUT_MS"] || "0", 10) || undefined;
 export const OPENAI_BASE_URL = process.env["OPENAI_BASE_URL"] || "";
 export let OPENAI_API_KEY = process.env["OPENAI_API_KEY"] || "";
+export let AZURE_OPENAI_API_KEY = process.env["AZURE_OPENAI_API_KEY"] || "";
+export let AZURE_OPENAI_ENDPOINT = process.env["AZURE_OPENAI_ENDPOINT"] || "";
 
 export function setApiKey(apiKey: string): void {
   OPENAI_API_KEY = apiKey;
